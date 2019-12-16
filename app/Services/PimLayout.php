@@ -74,7 +74,7 @@ class PimLayout
     {
         $items = $this->getLayout('Product', 'relationships');
         if (!empty($this->container->get('metadata')->get('entityDefs.Product.links.assets'))
-            && $this->isExistInDetail('asset_relations', $items)) {
+            && !$this->isExistInDetail('asset_relations', $items)) {
             $items[] = 'asset_relations';
             $this->setLayout($items, 'Product', 'relationships');
         }
@@ -87,7 +87,7 @@ class PimLayout
     {
         $items = $this->getLayout('Category', 'relationships');
         if (!empty($this->container->get('metadata')->get('entityDefs.Category.links.assets'))
-            && $this->isExistInDetail('asset_relations', $items)) {
+            && !$this->isExistInDetail('asset_relations', $items)) {
             $items[] = 'asset_relations';
             $this->setLayout($items, 'Category', 'relationships');
         }
