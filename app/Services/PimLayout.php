@@ -30,7 +30,7 @@ class PimLayout
     /**
      * Call all methods for modify layouts
      */
-    public function modify()
+    public function modify(): void
     {
         $methods = get_class_methods(self::class);
         foreach ($methods as $method) {
@@ -46,7 +46,7 @@ class PimLayout
      * @param string $scope
      * @param string $layout
      */
-    public function setLayout(array $values, string $scope, string $layout)
+    public function setLayout(array $values, string $scope, string $layout): void
     {
         $this->container->get('layout')->set($values, $scope, $layout);
         $this->container->get('layout')->save();
@@ -64,7 +64,7 @@ class PimLayout
     /**
      * Modify Product Relationships
      */
-    protected function modifyProductRelationships()
+    protected function modifyProductRelationships(): void
     {
         $items = $this->getLayout('Product', 'relationships');
         if (!empty($this->container->get('metadata')->get('entityDefs.Product.links.assets'))
@@ -77,7 +77,7 @@ class PimLayout
     /**
      * Modify Category Relationships
      */
-    protected function modifyCategoryRelationships()
+    protected function modifyCategoryRelationships(): void
     {
         $items = $this->getLayout('Category', 'relationships');
         if (!empty($this->container->get('metadata')->get('entityDefs.Category.links.assets'))
@@ -90,7 +90,7 @@ class PimLayout
     /**
      * Modify AssociatedProduct DetailSmall
      */
-    protected function modifyAssociatedProductDetailSmall()
+    protected function modifyAssociatedProductDetailSmall(): void
     {
         $rows = $this->getLayout('AssociatedProduct', 'detailSmall');
 
@@ -113,7 +113,7 @@ class PimLayout
     /**
      * Modify AssociatedProduct List
      */
-    protected function modifyProductList()
+    protected function modifyProductList(): void
     {
         $columns = $this->getLayout('Product', 'list');
         if ($this->isExistField('Product', 'image') && !$this->isExistInList('image', $columns)) {
@@ -125,7 +125,7 @@ class PimLayout
     /**
      * Modify AssociatedProduct List
      */
-    protected function modifyAssociatedProductList()
+    protected function modifyAssociatedProductList(): void
     {
         $columns = $this->getLayout('AssociatedProduct', 'list');
         if ($this->isExistField('AssociatedProduct', 'mainProductImage')
@@ -144,7 +144,7 @@ class PimLayout
     /**
      * Modify AssociatedProduct ListSmall
      */
-    protected function modifyAssociatedProductListSmall()
+    protected function modifyAssociatedProductListSmall(): void
     {
         $columns = $this->getLayout('AssociatedProduct', 'listSmall');
         if ($this->isExistField('AssociatedProduct', 'relatedProductImage')
@@ -158,7 +158,7 @@ class PimLayout
     /**
      * Modify Category List
      */
-    protected function modifyCategoryList()
+    protected function modifyCategoryList(): void
     {
         $columns = $this->getLayout('Category', 'list');
         if ($this->isExistField('Category', 'image') && !$this->isExistInList('image', $columns)) {
@@ -176,8 +176,8 @@ class PimLayout
      */
     protected function setAfterFieldInList(string $field, string $afterField, array $columns, array $data = []): array
     {
-        for ($k = 0; $k < count($columns); $k++) {
-            if ($columns[$k]['name'] == $afterField) {
+        for ($k = 0, $kMax = count($columns); $k < $kMax; $k++) {
+            if ($columns[$k]['name'] === $afterField) {
                 //put new row
                 array_splice($columns, ++$k, 0, [array_merge(['name' => $field], $data)]);
                 break;
