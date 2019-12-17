@@ -132,9 +132,10 @@ class PimLayout
             && $this->isExistField('AssociatedProduct', 'relatedProductImage')
             && !$this->isExistInList('mainProductImage', $columns)
             && !$this->isExistInList('relatedProductImage', $columns)) {
-
-            $columns = $this->setAfterFieldInList('mainProductImage', 'mainProduct', $columns, ['notSortable' => true]);
-            $columns = $this->setAfterFieldInList('relatedProductImage', 'relatedProduct', $columns, ['notSortable' => true]);
+            $columns = $this
+                ->setAfterFieldInList('mainProductImage', 'mainProduct', $columns, ['notSortable' => true]);
+            $columns = $this
+                ->setAfterFieldInList('relatedProductImage', 'relatedProduct', $columns, ['notSortable' => true]);
 
             $this->setLayout($columns, 'AssociatedProduct', 'list');
         }

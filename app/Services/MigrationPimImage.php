@@ -7,13 +7,11 @@ namespace DamCommon\Services;
 use Dam\Entities\Collection;
 use Espo\Core\Exceptions\Error;
 use Espo\Core\Exceptions\Forbidden;
-use Espo\ORM\EntityManager;
 use Espo\Services\Record;
 use Exception;
 use PDO;
 use stdClass;
 use Treo\Core\Utils\Auth;
-use Treo\Core\Utils\Metadata;
 use Treo\Services\AbstractService;
 
 /**
@@ -30,7 +28,7 @@ class MigrationPimImage extends AbstractService
     /**
      * @var string|null
      */
-    protected $collectionId = null;
+    protected $collectionId;
 
     /**
      * @var array
@@ -40,7 +38,7 @@ class MigrationPimImage extends AbstractService
     /**
      * Max execute queries at a time
      */
-    const MAX_QUERY = 3000;
+    public const MAX_QUERY = 3000;
 
     /**
      * @throws Error
@@ -72,7 +70,7 @@ class MigrationPimImage extends AbstractService
                 $foreign = !empty($attachment['product_id']) ? 'products' : 'categories';
                 try {
                     $idAsset = $this->createAsset($id, $attachment['name'], $foreign, $foreignId);
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     $this->setLog($id, $e);
                     continue;
                 }
@@ -81,7 +79,7 @@ class MigrationPimImage extends AbstractService
                 }
                 $this->migratedAttachment[$id] = $idAsset;
             } else {
-                $scope = $attachment['scope'] == 'Channel' ? $attachment['scope'] : null;
+                $scope = $attachment['scope'] === 'Channel' ? $attachment['scope'] : null;
                 if (!empty($pimImageChannels[$attachment['pimImage_id']])) {
                     $assetIdsWithChannel .= "'{$this->migratedAttachment[$id]}',";
                 }
@@ -116,7 +114,8 @@ class MigrationPimImage extends AbstractService
      * @param $id
      * @param $scope
      */
-    protected function insertAssetRelation(array $attachment, string $foreignId, string $foreignName, string $id, ?string $scope) {
+    protected function insertAssetRelation(array $attachment, string $foreignId, string $foreignName, string $id, ?string $scope): void
+    {
         $this->getEntityManager()
             ->nativeQuery(
                 "
@@ -130,15 +129,15 @@ class MigrationPimImage extends AbstractService
                         '{$attachment['sort_order']}',
                         'system',
                         'system',
-                        '{$scope}'
-                        )");
+                        '{$scope}')"
+            );
     }
 
     /**
      * @param string $assetIdsWithChannel
      * @param string $entityName
      */
-    protected function setChannelScope(string $assetIdsWithChannel, string $entityName)
+    protected function setChannelScope(string $assetIdsWithChannel, string $entityName): void
     {
         $field = lcfirst($entityName);
         if (in_array($field, ['product', 'category'])) {
@@ -228,7 +227,7 @@ class MigrationPimImage extends AbstractService
      * @param $attachment
      * @param $pathFile
      */
-    protected function updateAttachment($id, $attachment, $pathFile)
+    protected function updateAttachment($id, $attachment, $pathFile): void
     {
         $dataUpdate = [];
         $dataUpdate['hash_md5'] = hash_file('md5', $pathFile);
@@ -272,12 +271,12 @@ class MigrationPimImage extends AbstractService
      * @param string $entityName
      * @param string $assetIdsWithChannel
      */
-    protected function insertAssetRelationChannel(string $entityName, string $assetIdsWithChannel)
+    protected function insertAssetRelationChannel(string $entityName, string $assetIdsWithChannel): void
     {
         $where = '';
-        if ($entityName == 'Product') {
+        if ($entityName === 'Product') {
             $where = ' pi.product_id IS NOT NULL AND pi.product_id != \'\'';
-        } elseif ($entityName == 'Category') {
+        } elseif ($entityName === 'Category') {
             $where = ' pi.category_id IS NOT NULL AND pi.category_id != \'\'';
         } else {
             return;
@@ -306,9 +305,9 @@ class MigrationPimImage extends AbstractService
      */
     protected function updateMainImageUp(string $entityName)
     {
-        if ($entityName == 'Product') {
+        if ($entityName === 'Product') {
             $where = ' AND pi.product_id IS NOT NULL AND pi.product_id != \'\'';
-        } elseif ($entityName == 'Category') {
+        } elseif ($entityName === 'Category') {
             $where = ' AND pi.category_id IS NOT NULL AND pi.category_id != \'\'';
         } else {
             return;
