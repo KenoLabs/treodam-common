@@ -6,7 +6,6 @@ namespace DamCommon\Services;
 
 use Espo\Core\Utils\Json;
 use Treo\Core\Container;
-use Treo\Core\Utils\Metadata;
 
 /**
  * Class MigrationPimImage
@@ -33,16 +32,11 @@ class PimLayout
      */
     public function modify()
     {
-        /** @var Metadata $metadata */
-        $metadata = $this->container->get('metadata');
-        //if Pim and Dam installed
-        if ($metadata->isModuleInstalled('Pim') && $metadata->isModuleInstalled('Dam')) {
-            $methods = get_class_methods(self::class);
-            foreach ($methods as $method) {
-                //call modify methods
-                if ($method !== 'modify' && strpos($method, 'modify') !== false ){
-                    $this->{$method}();
-                }
+        $methods = get_class_methods(self::class);
+        foreach ($methods as $method) {
+            //call modify methods
+            if ($method !== 'modify' && strpos($method, 'modify') !== false) {
+                $this->{$method}();
             }
         }
     }
@@ -135,9 +129,9 @@ class PimLayout
     {
         $columns = $this->getLayout('AssociatedProduct', 'list');
         if ($this->isExistField('AssociatedProduct', 'mainProductImage')
-                && $this->isExistField('AssociatedProduct', 'relatedProductImage')
-                && !$this->isExistInList('mainProductImage', $columns)
-                && !$this->isExistInList('relatedProductImage', $columns)) {
+            && $this->isExistField('AssociatedProduct', 'relatedProductImage')
+            && !$this->isExistInList('mainProductImage', $columns)
+            && !$this->isExistInList('relatedProductImage', $columns)) {
 
             $columns = $this->setAfterFieldInList('mainProductImage', 'mainProduct', $columns, ['notSortable' => true]);
             $columns = $this->setAfterFieldInList('relatedProductImage', 'relatedProduct', $columns, ['notSortable' => true]);
@@ -153,7 +147,7 @@ class PimLayout
     {
         $columns = $this->getLayout('AssociatedProduct', 'listSmall');
         if ($this->isExistField('AssociatedProduct', 'relatedProductImage')
-                && !$this->isExistInList('relatedProductImage', $columns)) {
+            && !$this->isExistInList('relatedProductImage', $columns)) {
             $first = array_shift($columns);
             array_unshift($columns, $first, ['name' => 'relatedProductImage']);
         }
@@ -208,6 +202,7 @@ class PimLayout
 
         return $isExist;
     }
+
     /**
      * @param string $name
      * @param array $rows

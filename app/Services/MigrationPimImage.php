@@ -43,17 +43,6 @@ class MigrationPimImage extends AbstractService
     const MAX_QUERY = 3000;
 
     /**
-     * @param Metadata $metadata
-     * @param EntityManager $entityManager
-     * @return bool
-     */
-    public static function issetPimImage(Metadata $metadata, EntityManager $entityManager): bool
-    {
-       return  $metadata->isModuleInstalled('Pim')
-                    && $entityManager->nativeQuery("SHOW TABLES LIKE 'pim_image';")->rowCount() !== 0;
-    }
-
-    /**
      * @throws Error
      */
     public function run(): void
