@@ -355,7 +355,7 @@ class MigrationPimImage extends AbstractService
      */
     protected function setLog(string $id, Exception $e): void
     {
-        $GLOBALS['log']->error('Error migration pimImage to Asset. AttachmentId: ' . $id . ';' . $e->getMessage());
+        $GLOBALS['log']->error('Error migration pimImage to Asset. AttachmentId: ' . $id . ';' . $e->getMessage() . ';File:' . $e->getFile() . ';Line:'. $e->getLine());
     }
 
     /**
