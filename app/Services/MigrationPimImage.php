@@ -367,8 +367,7 @@ class MigrationPimImage extends AbstractService
     {
         $setValues = [];
         foreach ($values as $field => $value) {
-            $v = addslashes($value);
-            $setValues[] = "{$field} = '{$v}'";
+            $setValues[] = "{$field} = '$value'";
         }
         if (!empty($setValues) && !empty($id)) {
             $this->sqlUpdate[] = 'UPDATE ' . $table . ' SET ' . implode(',', $setValues) . " WHERE id = '{$id}'";
