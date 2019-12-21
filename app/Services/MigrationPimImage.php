@@ -12,6 +12,8 @@ use Exception;
 use PDO;
 use stdClass;
 use Treo\Core\Utils\Auth;
+use Treo\Core\Utils\Config;
+use Treo\Core\Utils\Util;
 use Treo\Services\AbstractService;
 
 /**
@@ -104,7 +106,7 @@ class MigrationPimImage extends AbstractService
         $this->updateMainImageUp('Category');
 
         $this->getEntityManager()->nativeQuery('DROP TABLE pim_image;
-                                                    DROP TABLE pim_image_channel;');
+                                                     DROP TABLE pim_image_channel;');
     }
 
     /**
@@ -262,6 +264,12 @@ class MigrationPimImage extends AbstractService
         $asset->code = md5((string)microtime());
         $asset->collectionId = $this->getCollectionAsset();
         $asset->{$foreign . 'Ids'} = [$foreignId];
+
+        foreach ($this->getInputLanguageList() as $lang) {
+            $nameField = 'name' . $lang;
+            $asset->{$nameField} = $asset->name;
+        }
+
         $assetEntity = $this->getService('Asset')->createEntity($asset);
 
         return $assetEntity->get('id');
@@ -390,5 +398,24 @@ class MigrationPimImage extends AbstractService
     protected function getService($name): Record
     {
         return $this->getContainer()->get("serviceFactory")->create($name);
+    }
+
+    /**
+     * @return array
+     */
+    protected function getInputLanguageList(): array
+    {
+        $result = [];
+
+        /** @var Config $config */
+        $config = $this->container->get('config');
+
+        if ($config->get('isMultilangActive', false)) {
+            foreach ($config->get('inputLanguageList', []) as $locale) {
+                $result[$locale] = ucfirst(Util::toCamelCase(strtolower($locale)));
+            }
+        }
+
+        return $result;
     }
 }
