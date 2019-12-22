@@ -33,16 +33,6 @@ class MigrationPimImage extends AbstractService
     protected $collectionId;
 
     /**
-     * @var array
-     */
-    protected $sqlUpdate = [];
-
-    /**
-     * Max execute queries at a time
-     */
-    public const MAX_QUERY = 3000;
-
-    /**
      * @throws Error
      */
     public function run(): void
@@ -118,20 +108,21 @@ class MigrationPimImage extends AbstractService
      */
     protected function insertAssetRelation(array $attachment, string $foreignId, string $foreignName, string $id, ?string $scope): void
     {
+        $params = [
+            'nameAsset' => (string)$attachment['name'],
+            'foreignName' => (string)$foreignName,
+            'foreignId' => (string)$foreignId,
+            'assetId' => (string)$this->migratedAttachment[$id],
+            'sortOrder' => $attachment['sort_order'],
+            'scope' => $scope
+        ];
         $this->getEntityManager()
             ->nativeQuery(
-                "
-                    INSERT INTO asset_relation
+                "INSERT INTO asset_relation
                     (id, name, entity_name, entity_id, asset_id, sort_order, created_by_id, assigned_user_id, scope)
                     VALUES (SUBSTR(MD5('{$attachment['pimImage_id']}_{$foreignId}'), 16),
-                        '{$attachment['name']}',
-                        '{$foreignName}',
-                        '{$foreignId}',
-                        '{$this->migratedAttachment[$id]}',
-                        '{$attachment['sort_order']}',
-                        'system',
-                        'system',
-                        '{$scope}')"
+                        :nameAsset, :foreignName, :foreignId, :assetId, :sortOrder,'system', 'system', :scope)",
+                $params
             );
     }
 
@@ -239,7 +230,6 @@ class MigrationPimImage extends AbstractService
             $dataUpdate['tmp_path'] = $pathFile;
         }
         $this->updateById('attachment', $dataUpdate, $id);
-        $this->executeUpdate($this->sqlUpdate);
     }
 
     /**
@@ -366,28 +356,13 @@ class MigrationPimImage extends AbstractService
     protected function updateById(string $table, array $values, string $id): void
     {
         $setValues = [];
+        $params = [];
         foreach ($values as $field => $value) {
-            $setValues[] = "{$field} = '$value'";
+            $setValues[] = "{$field} = :{$field}";
+            $params[$field] = $value;
         }
-        if (!empty($setValues) && !empty($id)) {
-            $this->sqlUpdate[] = 'UPDATE ' . $table . ' SET ' . implode(',', $setValues) . " WHERE id = '{$id}'";
-        }
-        if (count($this->sqlUpdate) >= self::MAX_QUERY) {
-            $this->executeUpdate($this->sqlUpdate);
-        }
-    }
-
-    /**
-     * Execute Sql-Update for Attachments
-     *
-     * @param array $queries
-     */
-    protected function executeUpdate(array $queries): void
-    {
-        if (!empty($queries)) {
-            $this->getEntityManager()->nativeQuery(implode(';', $queries));
-        }
-        $this->sqlUpdate = [];
+        $sql = 'UPDATE ' . $table . ' SET ' . implode(',', $setValues) . " WHERE id = '{$id}'";
+        $this->getEntityManager()->nativeQuery($sql, $params);
     }
 
     /**
