@@ -349,9 +349,10 @@ class MigrationPimImage extends AbstractService
                                    WHERE ar.scope = 'Global'
                                      AND ar.entity_name = '{$entityName}'
                                      AND ar.deleted = 0
+                                     AND ar.type = 'Gallery Image'
                                    GROUP BY ar.entity_id
                             ) as sort ON sort.entity_id = p.id
-                            LEFT JOIN asset_relation ar ON ar.entity_id = sort.entity_id AND ar.sort_order = sort.sort
+                            LEFT JOIN asset_relation ar ON ar.entity_id = sort.entity_id AND ar.sort_order = sort.sort AND ar.type = 'Gallery Image'
                         SET p.image_id = (SELECT file_id FROM asset a WHERE a.id = ar.asset_id), ar.role = '[\"Main\"]'
                         WHERE p.deleted = 0;
                   "
