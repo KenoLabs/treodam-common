@@ -48,9 +48,9 @@ class MigrationPimImage extends AbstractService
         $repAttachment = $this->getEntityManager()->getRepository('Attachment');
 
         $this->printMessage('Creating Assets');
-
+        $all = count($attachments);
         foreach ($attachments as $key => $attachment) {
-            if ($key % 1000) {
+            if (($all / $key) == 2) {
                 $this->printMessage('Created ' . $key . ' assets');
             }
             $id = $attachment['id'];
