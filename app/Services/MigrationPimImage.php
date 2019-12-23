@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DamCommon\Services;
 
 use Dam\Entities\Collection;
+use DateTime;
 use Espo\Core\Exceptions\Error;
 use Espo\Core\Exceptions\Forbidden;
 use Espo\Services\Record;
@@ -45,7 +46,13 @@ class MigrationPimImage extends AbstractService
         //for storing assetId with Channels
         $assetIdsWithChannel = '';
         $repAttachment = $this->getEntityManager()->getRepository('Attachment');
+
+        $this->printMessage('Creating Assets');
+
         foreach ($attachments as $key => $attachment) {
+            if ($key % 1000) {
+                $this->printMessage('Created ' . $key . ' assets');
+            }
             $id = $attachment['id'];
             $foreignName = !empty($attachment['product_id']) ? 'Product' : 'Category';
             $foreignId = !empty($attachment['product_id']) ? $attachment['product_id'] : $attachment['category_id'];
@@ -62,6 +69,11 @@ class MigrationPimImage extends AbstractService
                 $foreign = !empty($attachment['product_id']) ? 'products' : 'categories';
                 try {
                     $idAsset = $this->createAsset($id, $attachment['name'], $foreign, $foreignId);
+                    $this
+                        ->getEntityManager()
+                        ->nativeQuery("UPDATE asset_relation 
+                                            SET sort_order = '{$attachment['sort_order']}' 
+                                            WHERE entity_name = '{$foreignName}' AND entity_id = '{$foreignId}' AND asset_id = '{$idAsset}';");
                 } catch (Exception $e) {
                     $this->setLog($id, $e);
                     continue;
@@ -78,6 +90,8 @@ class MigrationPimImage extends AbstractService
                 $this->insertAssetRelation($attachment, $foreignId, $foreignName, $id, $scope);
             }
         }
+        $this->printMessage('Updating Scope');
+
         //remove last symbol(coma)
         $assetIdsWithChannel = substr($assetIdsWithChannel, 0, -1);
         if (!empty($assetIdsWithChannel)) {
@@ -92,11 +106,24 @@ class MigrationPimImage extends AbstractService
         $this->getEntityManager()
             ->nativeQuery("UPDATE asset_relation SET scope = 'Global' WHERE scope IS NULL OR scope = '';");
 
+        $this->printMessage('Updating Main Image');
+
         $this->updateMainImageUp('Product');
         $this->updateMainImageUp('Category');
 
+        $this->printMessage('Removing pimImages');
+
         $this->getEntityManager()->nativeQuery('DROP TABLE pim_image;
                                                      DROP TABLE pim_image_channel;');
+    }
+
+    /**
+     * @param string $msg
+     * @throws Exception
+     */
+    protected function printMessage(string $msg)
+    {
+        echo (new DateTime('NOW'))->format('H:i:s') . ' - ' . $msg . ';' . PHP_EOL;
     }
 
     /**
@@ -316,13 +343,6 @@ class MigrationPimImage extends AbstractService
         $this->getEntityManager()
             ->nativeQuery(
                 "
-                UPDATE asset_relation ar
-                    RIGHT JOIN asset a ON a.id = ar.asset_id
-                    RIGHT JOIN pim_image pi ON a.file_id = pi.image_id {$where}
-                SET ar.sort_order = pi.sort_order
-                WHERE ar.deleted = 0
-                  AND ar.entity_name = '{$entityName}';
-                  
                 UPDATE {$table} p
                        LEFT JOIN (SELECT ar.entity_id, min(ar.sort_order) as sort
                                    FROM asset_relation ar
@@ -332,8 +352,7 @@ class MigrationPimImage extends AbstractService
                                    GROUP BY ar.entity_id
                             ) as sort ON sort.entity_id = p.id
                             LEFT JOIN asset_relation ar ON ar.entity_id = sort.entity_id AND ar.sort_order = sort.sort
-                            LEFT JOIN asset a ON ar.asset_id = a.id
-                        SET p.image_id = a.file_id, ar.role = '[\"Main\"]'
+                        SET p.image_id = (SELECT file_id FROM asset a WHERE a.id = ar.asset_id), ar.role = '[\"Main\"]'
                         WHERE p.deleted = 0;
                   "
             );
