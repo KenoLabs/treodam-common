@@ -48,11 +48,7 @@ class MigrationPimImage extends AbstractService
         $repAttachment = $this->getEntityManager()->getRepository('Attachment');
 
         $this->printMessage('Creating Assets');
-        $all = count($attachments);
         foreach ($attachments as $key => $attachment) {
-            if (($all / $key) == 2) {
-                $this->printMessage('Created ' . $key . ' assets');
-            }
             $id = $attachment['id'];
             $foreignName = !empty($attachment['product_id']) ? 'Product' : 'Category';
             $foreignId = !empty($attachment['product_id']) ? $attachment['product_id'] : $attachment['category_id'];
@@ -341,22 +337,54 @@ class MigrationPimImage extends AbstractService
         $table = lcfirst($entityName);
 
         $this->getEntityManager()
-            ->nativeQuery(
-                "
-                UPDATE {$table} p
-                       LEFT JOIN (SELECT ar.entity_id, min(ar.sort_order) as sort
+            ->nativeQuery("UPDATE {$table} t SET t.image_id = NULL where deleted = 0");
+
+
+        $count = $this->getEntityManager()
+            ->nativeQuery("SELECT count(id) AS c FROM {$table} t where deleted = 0")->fetchColumn(0);
+
+        for ($j = 0; $j <= $count; $j += 10000) {
+            $entities = $this->getEntityManager()
+                ->nativeQuery("SELECT ar.entity_id, min(ar.sort_order) as sort
                                    FROM asset_relation ar
                                    WHERE ar.scope = 'Global'
                                      AND ar.entity_name = '{$entityName}'
                                      AND ar.deleted = 0
-                                     AND ar.type = 'Gallery Image'
-                                   GROUP BY ar.entity_id
-                            ) as sort ON sort.entity_id = p.id
-                            LEFT JOIN asset_relation ar ON ar.entity_id = sort.entity_id AND ar.sort_order = sort.sort AND ar.type = 'Gallery Image'
-                        SET p.image_id = (SELECT file_id FROM asset a WHERE a.id = ar.asset_id), ar.role = '[\"Main\"]'
-                        WHERE p.deleted = 0;
-                  "
-            );
+                                     AND (SELECT type FROM asset WHERE id = ar.asset_id) = 'Gallery Image'
+                                   GROUP BY ar.entity_id ORDER BY sort LIMIT 10000 OFFSET {$j}")
+                ->fetchAll(PDO::FETCH_ASSOC);
+
+            if (count($entities) > 0) {
+              foreach ($entities as $entity) {
+                  $assetRelation = $this
+                      ->getEntityManager()
+                      ->nativeQuery("
+                        SELECT asset_id, ar.id
+                        FROM asset_relation ar 
+                        WHERE ar.entity_id = '{$entity['entity_id']}'
+                            AND ar.sort_order = '{$entity['sort']}'
+                            AND ar.scope = 'Global'
+                            AND (SELECT type FROM asset WHERE id = ar.asset_id) = 'Gallery Image'
+                            AND deleted = 0 LIMIT 1")
+                    ->fetch(PDO::FETCH_ASSOC);
+
+                  if (!empty($assetRelation)) {
+                      $this->getEntityManager()
+                          ->nativeQuery(
+                              "UPDATE {$table} p
+                                SET p.image_id = (SELECT file_id FROM asset a WHERE a.id = '{$assetRelation['asset_id']}')
+                                WHERE p.deleted = 0 and id = '{$entity['entity_id']}'; 
+                                
+                                UPDATE asset_relation ar
+                                    SET ar.role = '[\"Main\"]'
+                                WHERE id = '{$assetRelation['id']}';
+                                ");
+                  }
+              }
+            } else {
+                break;
+            }
+        }
     }
 
     /**
