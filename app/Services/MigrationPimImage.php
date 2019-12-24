@@ -10,6 +10,7 @@ use Espo\Services\Record;
 use Exception;
 use PDO;
 use stdClass;
+use Treo\Composer\PostUpdate;
 use Treo\Core\Utils\Auth;
 use Treo\Core\Utils\Config;
 use Treo\Core\Utils\Util;
@@ -37,7 +38,7 @@ class MigrationPimImage extends AbstractService
         // rebuild DB
         $this->getContainer()->get('dataManager')->rebuild();
 
-        $this->printMessage('Getting PimImages');
+        PostUpdate::renderLine('Getting PimImages');
 
         $attachments = $this->getAttachmentsForUp();
         $pimImageChannels = $this->getPimImageChannels();
@@ -46,7 +47,7 @@ class MigrationPimImage extends AbstractService
         $assetIdsWithChannel = '';
         $repAttachment = $this->getEntityManager()->getRepository('Attachment');
 
-        $this->printMessage('Creating Assets');
+        PostUpdate::renderLine('Creating Assets');
         foreach ($attachments as $key => $attachment) {
             $id = $attachment['id'];
             $foreignName = !empty($attachment['product_id']) ? 'Product' : 'Category';
@@ -80,28 +81,29 @@ class MigrationPimImage extends AbstractService
                 $this->insertAssetRelation($attachment, $foreignId, $foreignName, $id, $scope);
             }
         }
-        $this->printMessage('Updating Scope');
+        PostUpdate::renderLine('Updating Scope');
 
         //remove last symbol(coma)
         $assetIdsWithChannel = substr($assetIdsWithChannel, 0, -1);
         if (!empty($assetIdsWithChannel)) {
             $this->setChannelScope($assetIdsWithChannel, 'Product');
             $this->setChannelScope($assetIdsWithChannel, 'Category');
-
             //create link asset_relation_channel
+            PostUpdate::renderLine('Updating Channel Product');
             $this->insertAssetRelationChannel('Product', $assetIdsWithChannel);
+            PostUpdate::renderLine('Updating Channel Category');
             $this->insertAssetRelationChannel('Category', $assetIdsWithChannel);
         }
 
         $this->getEntityManager()
             ->nativeQuery("UPDATE asset_relation SET scope = 'Global' WHERE scope IS NULL OR scope = '';");
 
-        $this->printMessage('Updating Main Image');
+        PostUpdate::renderLine('Updating Main Image');
 
         $this->updateMainImageUp('Product');
         $this->updateMainImageUp('Category');
 
-        $this->printMessage('Removing pimImages');
+        PostUpdate::renderLine('Removing pimImages');
 
         $this->getEntityManager()->nativeQuery('DROP TABLE pim_image;
                                                      DROP TABLE pim_image_channel;');
@@ -289,7 +291,7 @@ class MigrationPimImage extends AbstractService
             ->nativeQuery(
                 "
             INSERT INTO asset_relation_channel (channel_id, asset_relation_id)
-                SELECT  pic.channel_id, ar.id
+                SELECT DISTINCT pic.channel_id, ar.id
                 FROM pim_image AS pi
                     RIGHT JOIN pim_image_channel AS pic ON pi.id = pic.pim_image_id AND pic.deleted = 0
                     LEFT JOIN asset ON asset.file_id = pi.image_id AND asset.deleted = 0
@@ -342,15 +344,6 @@ class MigrationPimImage extends AbstractService
                         WHERE p.deleted = 0;
                   "
             );
-    }
-
-    /**
-     * @param string $msg
-     * @throws Exception
-     */
-    protected function printMessage(string $msg): void
-    {
-        echo (new \DateTime('NOW'))->format('H:i:s') . ' - ' . $msg . ';' . PHP_EOL;
     }
 
     /**
