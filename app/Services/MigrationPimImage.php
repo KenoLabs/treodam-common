@@ -1,11 +1,9 @@
 <?php
-
 declare(strict_types=1);
 
 namespace DamCommon\Services;
 
 use Dam\Entities\Collection;
-use DateTime;
 use Espo\Core\Exceptions\Error;
 use Espo\Core\Exceptions\Forbidden;
 use Espo\Services\Record;
@@ -16,7 +14,6 @@ use Treo\Core\Utils\Auth;
 use Treo\Core\Utils\Config;
 use Treo\Core\Utils\Util;
 use Treo\Services\AbstractService;
-
 /**
  * Class MigrationPimImage
  * @package DamCommon\Services
@@ -27,22 +24,20 @@ class MigrationPimImage extends AbstractService
      * @var array
      */
     protected $migratedAttachment = [];
-
     /**
      * @var string|null
      */
     protected $collectionId;
-
     /**
      * @throws Error
      */
     public function run(): void
     {
-        $this->printMessage('Get PimImage');
-
         (new Auth($this->getContainer()))->useNoAuth();
         // rebuild DB
         $this->getContainer()->get('dataManager')->rebuild();
+
+        $this->printMessage('Getting PimImages');
 
         $attachments = $this->getAttachmentsForUp();
         $pimImageChannels = $this->getPimImageChannels();
@@ -69,11 +64,6 @@ class MigrationPimImage extends AbstractService
                 $foreign = !empty($attachment['product_id']) ? 'products' : 'categories';
                 try {
                     $idAsset = $this->createAsset($id, $attachment['name'], $foreign, $foreignId);
-                    $this
-                        ->getEntityManager()
-                        ->nativeQuery("UPDATE asset_relation 
-                                            SET sort_order = '{$attachment['sort_order']}' 
-                                            WHERE entity_name = '{$foreignName}' AND entity_id = '{$foreignId}' AND asset_id = '{$idAsset}';");
                 } catch (Exception $e) {
                     $this->setLog($id, $e);
                     continue;
@@ -116,16 +106,6 @@ class MigrationPimImage extends AbstractService
         $this->getEntityManager()->nativeQuery('DROP TABLE pim_image;
                                                      DROP TABLE pim_image_channel;');
     }
-
-    /**
-     * @param string $msg
-     * @throws Exception
-     */
-    protected function printMessage(string $msg)
-    {
-        echo (new DateTime('NOW'))->format('H:i:s') . ' - ' . $msg . ';' . PHP_EOL;
-    }
-
     /**
      * @param array $attachment
      * @param $foreignId
@@ -152,7 +132,6 @@ class MigrationPimImage extends AbstractService
                 $params
             );
     }
-
     /**
      * @param string $assetIdsWithChannel
      * @param string $entityName
@@ -306,7 +285,6 @@ class MigrationPimImage extends AbstractService
         } else {
             return;
         }
-
         $this->getEntityManager()
             ->nativeQuery(
                 "
@@ -341,54 +319,38 @@ class MigrationPimImage extends AbstractService
         $table = lcfirst($entityName);
 
         $this->getEntityManager()
-            ->nativeQuery("UPDATE {$table} t SET t.image_id = NULL where deleted = 0");
-
-
-        $count = $this->getEntityManager()
-            ->nativeQuery("SELECT count(id) AS c FROM {$table} t where deleted = 0")->fetchColumn(0);
-
-        for ($j = 0; $j <= $count; $j += 10000) {
-            $entities = $this->getEntityManager()
-                ->nativeQuery("SELECT ar.entity_id, min(ar.sort_order) as sort
+            ->nativeQuery(
+                "
+                UPDATE asset_relation ar
+                    RIGHT JOIN asset a ON a.id = ar.asset_id
+                    RIGHT JOIN pim_image pi ON a.file_id = pi.image_id {$where}
+                SET ar.sort_order = pi.sort_order
+                WHERE ar.deleted = 0
+                  AND ar.entity_name = '{$entityName}';
+                  
+                UPDATE {$table} p
+                       LEFT JOIN (SELECT ar.entity_id, min(ar.sort_order) as sort
                                    FROM asset_relation ar
                                    WHERE ar.scope = 'Global'
                                      AND ar.entity_name = '{$entityName}'
                                      AND ar.deleted = 0
-                                     AND (SELECT type FROM asset WHERE id = ar.asset_id) = 'Gallery Image'
-                                   GROUP BY ar.entity_id ORDER BY sort LIMIT 10000 OFFSET {$j}")
-                ->fetchAll(PDO::FETCH_ASSOC);
+                                   GROUP BY ar.entity_id
+                            ) as sort ON sort.entity_id = p.id
+                            LEFT JOIN asset_relation ar ON ar.entity_id = sort.entity_id AND ar.sort_order = sort.sort
+                            LEFT JOIN asset a ON ar.asset_id = a.id AND a.type = 'Gallery Image'
+                        SET p.image_id = a.file_id, ar.role = '[\"Main\"]'
+                        WHERE p.deleted = 0;
+                  "
+            );
+    }
 
-            if (count($entities) > 0) {
-              foreach ($entities as $entity) {
-                  $assetRelation = $this
-                      ->getEntityManager()
-                      ->nativeQuery("
-                        SELECT asset_id, ar.id
-                        FROM asset_relation ar 
-                        WHERE ar.entity_id = '{$entity['entity_id']}'
-                            AND ar.sort_order = '{$entity['sort']}'
-                            AND ar.scope = 'Global'
-                            AND (SELECT type FROM asset WHERE id = ar.asset_id) = 'Gallery Image'
-                            AND deleted = 0 LIMIT 1")
-                    ->fetch(PDO::FETCH_ASSOC);
-
-                  if (!empty($assetRelation)) {
-                      $this->getEntityManager()
-                          ->nativeQuery(
-                              "UPDATE {$table} p
-                                    SET p.image_id = (SELECT file_id FROM asset a WHERE a.id = '{$assetRelation['asset_id']}')
-                                WHERE p.deleted = 0 and id = '{$entity['entity_id']}'; 
-                                
-                                UPDATE asset_relation ar
-                                    SET ar.role = '[\"Main\"]'
-                                WHERE id = '{$assetRelation['id']}';
-                                ");
-                  }
-              }
-            } else {
-                break;
-            }
-        }
+    /**
+     * @param string $msg
+     * @throws Exception
+     */
+    protected function printMessage(string $msg): void
+    {
+        echo (new \DateTime('NOW'))->format('H:i:s') . ' - ' . $msg . ';' . PHP_EOL;
     }
 
     /**
@@ -399,7 +361,6 @@ class MigrationPimImage extends AbstractService
     {
         $GLOBALS['log']->error('Error migration pimImage to Asset. AttachmentId: ' . $id . ';' . $e->getMessage() . ';File:' . $e->getFile() . ';Line:'. $e->getLine());
     }
-
     /**
      * @param string $table
      * @param array $values
