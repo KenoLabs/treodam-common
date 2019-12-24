@@ -38,7 +38,11 @@ class MigrationPimImage extends AbstractService
      */
     public function run(): void
     {
+        $this->printMessage('Get PimImage');
+
         (new Auth($this->getContainer()))->useNoAuth();
+        // rebuild DB
+        $this->getContainer()->get('dataManager')->rebuild();
 
         $attachments = $this->getAttachmentsForUp();
         $pimImageChannels = $this->getPimImageChannels();
@@ -372,7 +376,7 @@ class MigrationPimImage extends AbstractService
                       $this->getEntityManager()
                           ->nativeQuery(
                               "UPDATE {$table} p
-                                SET p.image_id = (SELECT file_id FROM asset a WHERE a.id = '{$assetRelation['asset_id']}')
+                                    SET p.image_id = (SELECT file_id FROM asset a WHERE a.id = '{$assetRelation['asset_id']}')
                                 WHERE p.deleted = 0 and id = '{$entity['entity_id']}'; 
                                 
                                 UPDATE asset_relation ar
