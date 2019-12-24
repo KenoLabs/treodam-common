@@ -34,9 +34,13 @@ class MigrationPimImage extends AbstractService
      */
     public function run(): void
     {
+        sleep(10);
         (new Auth($this->getContainer()))->useNoAuth();
         // rebuild DB
-        $this->getContainer()->get('dataManager')->rebuild();
+        if(!$this->getContainer()->get('dataManager')->rebuild()) {
+            sleep(10);
+            $this->getContainer()->get('dataManager')->rebuild()
+        }
 
         PostUpdate::renderLine('Getting PimImages');
 
