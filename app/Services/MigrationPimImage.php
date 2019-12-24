@@ -119,8 +119,8 @@ class MigrationPimImage extends AbstractService
     {
         $params = [
             'nameAsset' => (string)$attachment['name'],
-            'foreignName' => (string)$foreignName,
-            'foreignId' => (string)$foreignId,
+            'foreignName' => $foreignName,
+            'foreignId' => $foreignId,
             'assetId' => (string)$this->migratedAttachment[$id],
             'sortOrder' => $attachment['sort_order'],
             'scope' => $scope
@@ -287,6 +287,8 @@ class MigrationPimImage extends AbstractService
         } else {
             return;
         }
+        $field = lcfirst($entityName);
+
         $this->getEntityManager()
             ->nativeQuery(
                 "
@@ -296,7 +298,9 @@ class MigrationPimImage extends AbstractService
                     RIGHT JOIN pim_image_channel AS pic ON pi.id = pic.pim_image_id AND pic.deleted = 0
                     LEFT JOIN asset ON asset.file_id = pi.image_id AND asset.deleted = 0
                     LEFT JOIN asset_relation AS ar
-                       ON ar.entity_name = '{$entityName}' AND ar.asset_id = asset.id
+                       ON ar.entity_name = '{$entityName}' 
+                          AND ar.asset_id = asset.id
+                          AND ar.entity_id = pi.{$field}_id
                           AND ar.deleted = 0 AND ar.scope = 'Channel'
                 WHERE {$where}
                   AND pi.deleted = 0
@@ -319,13 +323,14 @@ class MigrationPimImage extends AbstractService
         }
 
         $table = lcfirst($entityName);
+        $field = $table;
 
         $this->getEntityManager()
             ->nativeQuery(
                 "
                 UPDATE asset_relation ar
                     RIGHT JOIN asset a ON a.id = ar.asset_id
-                    RIGHT JOIN pim_image pi ON a.file_id = pi.image_id {$where}
+                    RIGHT JOIN pim_image pi ON a.file_id = pi.image_id AND pi.{$field}_id = ar.entity_id {$where}
                 SET ar.sort_order = pi.sort_order
                 WHERE ar.deleted = 0
                   AND ar.entity_name = '{$entityName}';
