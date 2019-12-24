@@ -39,7 +39,7 @@ class MigrationPimImage extends AbstractService
         // rebuild DB
         if(!$this->getContainer()->get('dataManager')->rebuild()) {
             sleep(10);
-            $this->getContainer()->get('dataManager')->rebuild()
+            $this->getContainer()->get('dataManager')->rebuild();
         }
 
         PostUpdate::renderLine('Getting PimImages');
