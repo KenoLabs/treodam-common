@@ -34,9 +34,13 @@ class MigrationPimImage extends AbstractService
      */
     public function run(): void
     {
+        sleep(10);
         (new Auth($this->getContainer()))->useNoAuth();
         // rebuild DB
-        $this->getContainer()->get('dataManager')->rebuild();
+        if(!$this->getContainer()->get('dataManager')->rebuild()) {
+            sleep(10);
+            $this->getContainer()->get('dataManager')->rebuild();
+        }
 
         PostUpdate::renderLine('Getting PimImages');
 
@@ -107,27 +111,7 @@ class MigrationPimImage extends AbstractService
 
         $this->getEntityManager()->nativeQuery('DROP TABLE pim_image;
                                                      DROP TABLE pim_image_channel;');
-
-        PostUpdate::renderLine('Migrate Product Variants');
-
-        $this->migrateUpVariants();
     }
-
-    protected function migrateUpVariants(): void
-    {
-        $sqlReplace = "UPDATE product SET data = REPLACE(data, 'pimImages', 'asset_relations') WHERE type = 'productVariant' AND data LIKE '%pimImages%'";
-
-        $this->getEntityManager()->nativeQuery($sqlReplace);
-
-        $sqlMainImage = " 
-                    UPDATE product AS v
-                        LEFT JOIN product AS c ON v.configurable_product_id = c.id AND c.type = 'configurableProduct'
-                                SET v.image_id = c.image_id, v.image_name = c.image_name
-                            WHERE v.data NOT LIKE '%asset_relations%' AND v.type = 'productVariant'";
-
-        $this->getEntityManager()->nativeQuery($sqlMainImage);
-    }
-
     /**
      * @param array $attachment
      * @param $foreignId
