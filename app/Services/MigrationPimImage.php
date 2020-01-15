@@ -126,7 +126,7 @@ class MigrationPimImage extends AbstractService
         $sqlMainImage = " 
                     UPDATE product AS v
                         LEFT JOIN product AS c ON v.configurable_product_id = c.id AND c.type = 'configurableProduct'
-                                SET v.image_id = c.image_id, v.image_name = c.image_name
+                                SET v.image_id = c.image_id
                             WHERE v.data NOT LIKE '%asset_relations%' AND v.type = 'productVariant'";
 
         $this->getEntityManager()->nativeQuery($sqlMainImage);
