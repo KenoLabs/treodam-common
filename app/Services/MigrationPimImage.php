@@ -68,7 +68,7 @@ class MigrationPimImage extends AbstractService
                 //creating asset
                 $foreign = !empty($attachment['product_id']) ? 'products' : 'categories';
                 try {
-                    $idAsset = $this->createAsset($id, $attachment['name'], $foreign, $foreignId, $attachment['assigned_user_id']);
+                    $idAsset = $this->createAsset($id, $attachment['name'], $foreign, $foreignId);
                 } catch (Exception $e) {
                     $this->setLog($id, $e);
                     continue;
@@ -111,6 +111,26 @@ class MigrationPimImage extends AbstractService
 
         $this->getEntityManager()->nativeQuery('DROP TABLE pim_image;
                                                      DROP TABLE pim_image_channel;');
+
+        PostUpdate::renderLine('Migrate Product Variants');
+
+        $this->migrateUpVariants();
+    }
+
+
+    protected function migrateUpVariants(): void
+    {
+        $sqlReplace = "UPDATE product SET data = REPLACE(data, 'pimImages', 'asset_relations') WHERE type = 'productVariant' AND data LIKE '%pimImages%'";
+
+        $this->getEntityManager()->nativeQuery($sqlReplace);
+
+        $sqlMainImage = " 
+                    UPDATE product AS v
+                        LEFT JOIN product AS c ON v.configurable_product_id = c.id AND c.type = 'configurableProduct'
+                                SET v.image_id = c.image_id
+                            WHERE v.data NOT LIKE '%asset_relations%' AND v.type = 'productVariant'";
+
+        $this->getEntityManager()->nativeQuery($sqlMainImage);
     }
 
     /**
@@ -258,7 +278,7 @@ class MigrationPimImage extends AbstractService
      * @throws Error
      * @throws Forbidden
      */
-    protected function createAsset(string $fileId, string $fileName, string $foreign, string $foreignId, ?string $assignedUserId): string
+    protected function createAsset(string $fileId, string $fileName, string $foreign, string $foreignId): string
     {
         $asset = new StdClass();
         $asset->type = 'Gallery Image';
