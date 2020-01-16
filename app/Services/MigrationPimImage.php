@@ -68,7 +68,7 @@ class MigrationPimImage extends AbstractService
                 //creating asset
                 $foreign = !empty($attachment['product_id']) ? 'products' : 'categories';
                 try {
-                    $idAsset = $this->createAsset($id, $attachment['name'], $foreign, $foreignId);
+                    $idAsset = $this->createAsset($id, $attachment['name'], $foreign, $foreignId, $attachment['assigned_user_id']);
                 } catch (Exception $e) {
                     $this->setLog($id, $e);
                     continue;
@@ -82,7 +82,7 @@ class MigrationPimImage extends AbstractService
                 if (!empty($pimImageChannels[$attachment['pimImage_id']])) {
                     $assetIdsWithChannel .= "'{$this->migratedAttachment[$id]}',";
                 }
-                $this->insertAssetRelation($attachment, $foreignId, $foreignName, $id, $scope);
+                $this->insertAssetRelation($attachment, $foreignId, $foreignName, $id, $scope, $attachment['assigned_user_id']);
             }
         }
         PostUpdate::renderLine('Updating Scope');
@@ -112,14 +112,16 @@ class MigrationPimImage extends AbstractService
         $this->getEntityManager()->nativeQuery('DROP TABLE pim_image;
                                                      DROP TABLE pim_image_channel;');
     }
+
     /**
      * @param array $attachment
-     * @param $foreignId
-     * @param $foreignName
-     * @param $id
-     * @param $scope
+     * @param string $foreignId
+     * @param string $foreignName
+     * @param string $id
+     * @param string|null $assignedUserId
+     * @param string|null $scope
      */
-    protected function insertAssetRelation(array $attachment, string $foreignId, string $foreignName, string $id, ?string $scope): void
+    protected function insertAssetRelation(array $attachment, string $foreignId, string $foreignName, string $id, ?string $assignedUserId,?string $scope): void
     {
         $params = [
             'nameAsset' => (string)$attachment['name'],
@@ -127,14 +129,15 @@ class MigrationPimImage extends AbstractService
             'foreignId' => $foreignId,
             'assetId' => (string)$this->migratedAttachment[$id],
             'sortOrder' => $attachment['sort_order'],
-            'scope' => $scope
+            'scope' => $scope,
+            'assigned_user_id' => $assignedUserId
         ];
         $this->getEntityManager()
             ->nativeQuery(
                 "INSERT INTO asset_relation
                     (id, name, entity_name, entity_id, asset_id, sort_order, created_by_id, assigned_user_id, scope)
                     VALUES (SUBSTR(MD5('{$attachment['pimImage_id']}_{$foreignId}'), 16),
-                        :nameAsset, :foreignName, :foreignId, :assetId, :sortOrder,'system', 'system', :scope)",
+                        :nameAsset, :foreignName, :foreignId, :assetId, :sortOrder,'system', :assigned_user_id, :scope)",
                 $params
             );
     }
@@ -172,7 +175,7 @@ class MigrationPimImage extends AbstractService
             ->getEntityManager()
             ->nativeQuery(
                 'SELECT a.id, a.storage_file_path, a.storage, a.name,a.tmp_path, pi.product_id, pi.category_id,
-                            pi.id as pimImage_id, pi.scope, pi.sort_order
+                             pi.assigned_user_id, pi.id as pimImage_id, pi.scope, pi.sort_order
                         FROM attachment a
                                  RIGHT JOIN pim_image AS pi ON pi.image_id = a.id AND pi.deleted = 0 
                         WHERE a.deleted = 0'
@@ -250,11 +253,12 @@ class MigrationPimImage extends AbstractService
      * @param string $foreign
      * @param string $foreignId
      *
+     * @param string|null $assignedUserId
      * @return string
      * @throws Error
      * @throws Forbidden
      */
-    protected function createAsset(string $fileId, string $fileName, string $foreign, string $foreignId): string
+    protected function createAsset(string $fileId, string $fileName, string $foreign, string $foreignId, ?string $assignedUserId): string
     {
         $asset = new StdClass();
         $asset->type = 'Gallery Image';
@@ -265,6 +269,7 @@ class MigrationPimImage extends AbstractService
         $asset->nameOfFile = $asset->name;
         $asset->code = md5((string)microtime());
         $asset->collectionId = $this->getCollectionAsset();
+        $asset->assignedUserId = $assignedUserId;
         $asset->{$foreign . 'Ids'} = [$foreignId];
 
         foreach ($this->getInputLanguageList() as $lang) {
