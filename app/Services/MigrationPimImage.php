@@ -68,7 +68,7 @@ class MigrationPimImage extends AbstractService
                 //creating asset
                 $foreign = !empty($attachment['product_id']) ? 'products' : 'categories';
                 try {
-                    $idAsset = $this->createAsset($id, $attachment['name'], $foreign, $foreignId);
+                    $idAsset = $this->createAsset($id, $attachment['name'], $foreign, $foreignId, $attachment['assigned_user_id']);
                 } catch (Exception $e) {
                     $this->setLog($id, $e);
                     continue;
@@ -82,7 +82,7 @@ class MigrationPimImage extends AbstractService
                 if (!empty($pimImageChannels[$attachment['pimImage_id']])) {
                     $assetIdsWithChannel .= "'{$this->migratedAttachment[$id]}',";
                 }
-                $this->insertAssetRelation($attachment, $foreignId, $foreignName, $id, $scope, $attachment['assigned_user_id']);
+                $this->insertAssetRelation($attachment, $foreignId, $foreignName, $id, $attachment['assigned_user_id'], $scope);
             }
         }
         PostUpdate::renderLine('Updating Scope');
@@ -117,7 +117,9 @@ class MigrationPimImage extends AbstractService
         $this->migrateUpVariants();
     }
 
-
+    /**
+     * Migrate Variants
+     */
     protected function migrateUpVariants(): void
     {
         $sqlReplace = "UPDATE product SET data = REPLACE(data, 'pimImages', 'asset_relations') WHERE type = 'productVariant' AND data LIKE '%pimImages%'";
@@ -141,7 +143,7 @@ class MigrationPimImage extends AbstractService
      * @param string|null $assignedUserId
      * @param string|null $scope
      */
-    protected function insertAssetRelation(array $attachment, string $foreignId, string $foreignName, string $id, ?string $assignedUserId,?string $scope): void
+    protected function insertAssetRelation(array $attachment, string $foreignId, string $foreignName, string $id, ?string $assignedUserId, ?string $scope): void
     {
         $params = [
             'nameAsset' => (string)$attachment['name'],
@@ -149,8 +151,8 @@ class MigrationPimImage extends AbstractService
             'foreignId' => $foreignId,
             'assetId' => (string)$this->migratedAttachment[$id],
             'sortOrder' => $attachment['sort_order'],
-            'scope' => $scope,
-            'assigned_user_id' => $assignedUserId
+            'assigned_user_id' => $assignedUserId,
+            'scope' => $scope
         ];
         $this->getEntityManager()
             ->nativeQuery(
@@ -272,13 +274,13 @@ class MigrationPimImage extends AbstractService
      * @param string $fileName
      * @param string $foreign
      * @param string $foreignId
-     *
      * @param string|null $assignedUserId
+     *
      * @return string
      * @throws Error
      * @throws Forbidden
      */
-    protected function createAsset(string $fileId, string $fileName, string $foreign, string $foreignId): string
+    protected function createAsset(string $fileId, string $fileName, string $foreign, string $foreignId, ?string $assignedUserId): string
     {
         $asset = new StdClass();
         $asset->type = 'Gallery Image';
@@ -327,10 +329,11 @@ class MigrationPimImage extends AbstractService
                     RIGHT JOIN pim_image_channel AS pic ON pi.id = pic.pim_image_id AND pic.deleted = 0
                     LEFT JOIN asset ON asset.file_id = pi.image_id AND asset.deleted = 0
                     LEFT JOIN asset_relation AS ar
-                       ON ar.entity_name = '{$entityName}' 
+                       ON     ar.entity_name = '{$entityName}' 
                           AND ar.asset_id = asset.id
                           AND ar.entity_id = pi.{$field}_id
-                          AND ar.deleted = 0 AND ar.scope = 'Channel'
+                          AND ar.deleted = 0 
+                          AND ar.scope = 'Channel'
                 WHERE {$where}
                   AND pi.deleted = 0
                   AND pi.scope = 'Channel'
