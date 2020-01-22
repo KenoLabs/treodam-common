@@ -111,10 +111,11 @@ class MigrationPimImage extends AbstractService
 
         $this->getEntityManager()->nativeQuery('DROP TABLE pim_image;
                                                      DROP TABLE pim_image_channel;');
+        if ($this->isVariants()) {
+            PostUpdate::renderLine('Migrate Product Variants');
 
-        PostUpdate::renderLine('Migrate Product Variants');
-
-        $this->migrateUpVariants();
+            $this->migrateUpVariants();
+        }
     }
 
     /**
@@ -406,6 +407,19 @@ class MigrationPimImage extends AbstractService
         }
         $sql = 'UPDATE ' . $table . ' SET ' . implode(',', $setValues) . " WHERE id = '{$id}'";
         $this->getEntityManager()->nativeQuery($sql, $params);
+    }
+
+    /**
+     * @return bool
+     */
+    protected function isVariants(): bool
+    {
+        $result = $this
+            ->getEntityManager()
+            ->nativeQuery('SHOW COLUMNS FROM `product` LIKE \'configurable_product_id\'')
+            ->fetch(PDO::FETCH_ASSOC);
+
+        return !empty($result);
     }
 
     /**
