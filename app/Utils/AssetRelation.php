@@ -38,8 +38,8 @@ class AssetRelation
     {
         $select = '';
         foreach ($selectParams as $alias => $selectParam) {
-            $a = is_string($alias) ? $alias : $selectParam;
-            $select .=  "$selectParam AS $a,";
+            $a = is_string($alias) ? 'AS ' . $alias : '';
+            $select .= $selectParam . $a . ',' ;
         }
         $select = mb_substr($select, 0, -1);
 
@@ -63,12 +63,15 @@ class AssetRelation
 
     /**
      * @param string $link
+     * @param array $where
      * @return Asset|null
      */
-    public function getAsset(string $link): ?Asset
+    public function getAsset(string $link, array $where = []): ?Asset
     {
+        $result = null;
+
         $hash = hash_file('md5', $link);
-        $idAttachment =  $this
+        $attachment =  $this
             ->getEntityManager()
             ->getRepository('Attachment')
             ->select(['id'])
@@ -79,14 +82,17 @@ class AssetRelation
             ])
             ->findOne();
 
-        return $this
-            ->getEntityManager()
-            ->getRepository('Asset')
-            ->select(['id', 'type', 'fileId'])
-            ->where([
-                'fileId' => $idAttachment
-            ])
-            ->findOne();
+        if (!empty($attachment)) {
+            $where = array_merge($where, ['fileId' => $attachment->get('id')]);
+
+            $result = $this
+                ->getEntityManager()
+                ->getRepository('Asset')
+                ->select(['id', 'type', 'fileId'])
+                ->where($where)
+                ->findOne();
+        }
+        return $result;
     }
 
     /**
